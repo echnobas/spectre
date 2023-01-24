@@ -1,6 +1,6 @@
-pub mod xp;
+pub mod exec;
 pub mod register;
 pub mod version;
-pub mod exec;
+pub mod xp;
 
 // PGPASSWORD=Passw0rd psql -h localhost -U admin
