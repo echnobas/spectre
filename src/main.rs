@@ -1,12 +1,16 @@
 mod commands;
 mod error;
+mod rblx;
+
+#[macro_use]
+extern crate serde;
 
 use std::env;
 use std::error::Error;
 use std::sync::Arc;
 
 use serenity::async_trait;
-use serenity::model::application::interaction::{Interaction};
+use serenity::model::application::interaction::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
@@ -25,23 +29,27 @@ struct Handler;
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-
             let command_result = match command.data.name.as_str() {
                 "xp" => commands::xp::run(&ctx, &command).await,
                 "register" => commands::register::run(&ctx, &command).await,
                 "version" => commands::version::run(&ctx, &command).await,
                 "exec" => commands::exec::run(&ctx, &command).await,
-                _ => { return }
+                _ => return,
             };
 
             match command_result {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(why) => {
-                    _ = command.channel_id.send_message(&ctx.http, |m| {
-                        m.embed(|e| e
-                            .title("An error occured")
-                            .description(&format!("```\n{:?}```", why)))
-                    }).await;
+                    println!("{:?}", why);
+                    _ = command
+                        .channel_id
+                        .send_message(&ctx.http, |m| {
+                            m.embed(|e| {
+                                e.title("An error occured")
+                                    .description(&format!("```\n{:?}```", why))
+                            })
+                        })
+                        .await;
                 }
             }
         }
@@ -50,14 +58,19 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
-        let commands = GuildId::set_application_commands(&GuildId(1060269829619191888), &ctx.http, |commands| {
-            commands
-                .create_application_command(|command| commands::xp::register(command))
-                .create_application_command(|command| commands::register::register(command))
-                .create_application_command(|command| commands::version::register(command))
-                .create_application_command(|command| commands::exec::register(command))
-        })
-        .await.unwrap();
+        let commands = GuildId::set_application_commands(
+            &GuildId(1060269829619191888),
+            &ctx.http,
+            |commands| {
+                commands
+                    .create_application_command(|command| commands::xp::register(command))
+                    .create_application_command(|command| commands::register::register(command))
+                    .create_application_command(|command| commands::version::register(command))
+                    .create_application_command(|command| commands::exec::register(command))
+            },
+        )
+        .await
+        .unwrap();
     }
 }
 
@@ -75,18 +88,27 @@ async fn main() {
         let mut data = client.data.write().await;
 
         let mut cfg = Config::new();
-        cfg.host = Some("127.0.0.1".to_owned());
+        cfg.host = Some("db".to_owned());
         cfg.port = Some(5432);
-        cfg.user = Some("admin".to_owned());
-        cfg.password = Some("Passw0rd".to_owned());
-        cfg.dbname = Some("admin".to_owned());
+        cfg.user = Some("postgres".to_owned());
+        cfg.password = Some("postgres".to_owned());
+        cfg.dbname = Some("master".to_owned());
 
-        cfg.manager = Some(ManagerConfig { recycling_method: RecyclingMethod::Fast });
+        cfg.manager = Some(ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        });
 
-        let pool = cfg.create_pool(Some(Runtime::Tokio1), tokio_postgres::NoTls).unwrap();
+        let pool = cfg
+            .create_pool(Some(Runtime::Tokio1), tokio_postgres::NoTls)
+            .unwrap();
 
         // Migration
-        pool.get().await.unwrap().batch_execute(include_str!("../migrations.sql")).await.unwrap();
+        pool.get()
+            .await
+            .unwrap()
+            .batch_execute(include_str!("../migrations.sql"))
+            .await
+            .unwrap();
 
         data.insert::<PostgresPool>(Arc::new(pool));
     }
