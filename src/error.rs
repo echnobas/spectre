@@ -10,4 +10,6 @@ pub enum ReportableError {
     Discord(#[from] serenity::Error),
     #[error("Internal Error occured: {0}")]
     InternalError(&'static str),
+    #[error("{0}")]
+    UserError(&'static str)
 }
