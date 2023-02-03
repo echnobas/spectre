@@ -1,6 +1,7 @@
 use serde_json::Value;
 
 use anyhow::Result;
+use super::url;
 use crate::error::ReportableError;
 
 #[derive(PartialEq, Debug, Deserialize)]
@@ -12,6 +13,7 @@ pub struct User {
     description: String,
 }
 
+#[allow(dead_code, unused_variables)]
 impl User {
     pub fn get_username(&self) -> &str {
         &self.username
@@ -26,12 +28,13 @@ impl User {
     }
 
     pub async fn get_thumbnail(&self) -> Result<String, ReportableError> {
+        // Ideally redis cache check here, Option<Redis>?
         #[derive(Deserialize)]
         struct Response {
             #[serde(rename = "imageUrl")]
             url: String,
         }
-        let response = reqwest::get(&format!("https://thumbnails.roblox.com/v1/users/avatar-bust?userIds={}&size=420x420&format=Png&isCircular=false", self.user_id)).await?;
+        let response = reqwest::get(url::thumbnails_users_avatar_bust(self.user_id)).await?;
         
         let data = response.json::<Value>().await?.get("data").and_then(|v| serde_json::from_value::<[Response; 1]>(v.to_owned()).ok());
         data.and_then(|data| { data
@@ -43,7 +46,7 @@ impl User {
 
     pub async fn from_userid(user_id: i64) -> Result<Self, ReportableError> {
         let response =
-            reqwest::get(&format!("https://users.roblox.com/v1/users/{}", user_id)).await?;
+            reqwest::get(url::user_v1_users(user_id)).await?;
         if response.status().is_success() {
             response.json::<Self>().await.map_err(|e| e.into())
         } else {
@@ -52,11 +55,7 @@ impl User {
     }
 
     pub async fn from_username<T: AsRef<str>>(username: T) -> Result<Self, ReportableError> {
-        let response = reqwest::get(&format!(
-            "https://api.roblox.com/users/get-by-username?username={}",
-            username.as_ref()
-        ))
-        .await?;
+        let response = reqwest::get(url::users_get_by_username(username)).await?;
         if response.status().is_success() {
             Self::from_userid(
                 response
