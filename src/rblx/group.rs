@@ -1,8 +1,8 @@
 use serde_json::Value;
 
-use anyhow::Result;
 use super::url;
 use crate::error::ReportableError;
+use anyhow::Result;
 
 #[derive(Debug, Deserialize)]
 pub struct Group {

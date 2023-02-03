@@ -1,8 +1,8 @@
 use serde_json::Value;
 
-use anyhow::Result;
 use super::url;
 use crate::error::ReportableError;
+use anyhow::Result;
 
 #[derive(PartialEq, Debug, Deserialize)]
 pub struct User {
@@ -35,18 +35,18 @@ impl User {
             url: String,
         }
         let response = reqwest::get(url::thumbnails_users_avatar_bust(self.user_id)).await?;
-        
-        let data = response.json::<Value>().await?.get("data").and_then(|v| serde_json::from_value::<[Response; 1]>(v.to_owned()).ok());
-        data.and_then(|data| { data
-            .into_iter()
-            .next()
-            .map(|v| v.url)
-        }).ok_or(ReportableError::InternalError("Failed to get avatar URL"))
+
+        let data = response
+            .json::<Value>()
+            .await?
+            .get("data")
+            .and_then(|v| serde_json::from_value::<[Response; 1]>(v.to_owned()).ok());
+        data.and_then(|data| data.into_iter().next().map(|v| v.url))
+            .ok_or(ReportableError::InternalError("Failed to get avatar URL"))
     }
 
     pub async fn from_userid(user_id: i64) -> Result<Self, ReportableError> {
-        let response =
-            reqwest::get(url::user_v1_users(user_id)).await?;
+        let response = reqwest::get(url::user_v1_users(user_id)).await?;
         if response.status().is_success() {
             response.json::<Self>().await.map_err(|e| e.into())
         } else {
@@ -98,11 +98,14 @@ mod tests {
         assert_eq!(user.get_username(), "Roblox");
     }
 
-
     // May fail if avatar URL changes
     #[tokio::test]
     async fn test_get_thumbnail() {
         let user = User::from_userid(1).await.unwrap();
-        assert_eq!(user.get_thumbnail().await.unwrap(), "https://tr.rbxcdn.com/b7c2dce11d623d2261d6cc9368174a41/420/420/AvatarBust/Png".to_owned());
+        assert_eq!(
+            user.get_thumbnail().await.unwrap(),
+            "https://tr.rbxcdn.com/b7c2dce11d623d2261d6cc9368174a41/420/420/AvatarBust/Png"
+                .to_owned()
+        );
     }
 }

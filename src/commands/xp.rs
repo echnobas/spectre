@@ -7,9 +7,9 @@ use serenity::model::prelude::interaction::application_command::{
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Context;
 
-use anyhow::Result;
 use crate::error::ReportableError;
 use crate::PostgresPool;
+use anyhow::Result;
 
 pub async fn run(
     ctx: &Context,
@@ -38,7 +38,11 @@ pub async fn run(
                         Some(CommandDataOptionValue::String(username)) => {
                             crate::rblx::user::User::from_username(username).await?
                         }
-                        _ => return Err(ReportableError::InternalError("Username/UserID was not received")),
+                        _ => {
+                            return Err(ReportableError::InternalError(
+                                "Username/UserID was not received",
+                            ))
+                        }
                     };
 
                     let xp = match options.get(1).and_then(|r| r.resolved.as_ref()) {
@@ -49,7 +53,9 @@ pub async fn run(
                                 -*group
                             }
                         }
-                        _ => return Err(ReportableError::InternalError("Argument was not received")),
+                        _ => {
+                            return Err(ReportableError::InternalError("Argument was not received"))
+                        }
                     };
 
                     pool.execute(
@@ -87,7 +93,11 @@ pub async fn run(
                         Some(CommandDataOptionValue::String(username)) => {
                             crate::rblx::user::User::from_username(username).await?
                         }
-                        _ => return Err(ReportableError::InternalError("Username/UserID was not received")),
+                        _ => {
+                            return Err(ReportableError::InternalError(
+                                "Username/UserID was not received",
+                            ))
+                        }
                     };
                     let thumbnail = user.get_thumbnail().await?;
 

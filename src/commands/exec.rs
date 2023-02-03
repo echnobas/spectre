@@ -1,15 +1,13 @@
 use serenity::builder::CreateApplicationCommand;
 use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
-use serenity::model::prelude::interaction::application_command::{
-    CommandDataOptionValue,
-};
+use serenity::model::prelude::interaction::application_command::CommandDataOptionValue;
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Context;
 
-use anyhow::Result;
 use crate::error::ReportableError;
 use crate::PostgresPool;
+use anyhow::Result;
 
 pub async fn run(
     ctx: &Context,

@@ -15,7 +15,10 @@ pub fn user_v1_users(user_id: i64) -> String {
 
 // https://api.roblox.com/users/get-by-username?username={}
 pub fn users_get_by_username<S: AsRef<str>>(username: S) -> String {
-    format!("https://api.roblox.com/users/get-by-username?username={}", username.as_ref())
+    format!(
+        "https://api.roblox.com/users/get-by-username?username={}",
+        username.as_ref()
+    )
 }
 
 // https://thumbnails.roblox.com/v1/users/avatar-bust?userIds={}&size=420x420&format=Png&isCircular=false

@@ -7,9 +7,9 @@ use serenity::model::prelude::interaction::application_command::{
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Context;
 
-use anyhow::Result;
 use crate::error::ReportableError;
 use crate::PostgresPool;
+use anyhow::Result;
 
 pub async fn run(
     ctx: &Context,
