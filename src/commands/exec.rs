@@ -1,15 +1,11 @@
-use std::io::Write;
-
 use serenity::builder::CreateApplicationCommand;
-use serenity::futures::StreamExt;
 use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
 use serenity::model::prelude::interaction::application_command::{
-    CommandDataOption, CommandDataOptionValue,
+    CommandDataOptionValue,
 };
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Context;
-use tokio_postgres::GenericClient;
 
 use anyhow::Result;
 use crate::error::ReportableError;
