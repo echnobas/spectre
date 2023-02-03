@@ -46,8 +46,10 @@ impl User {
             reqwest::get(&format!("https://users.roblox.com/v1/users/{}", user_id)).await?;
         if response.status().is_success() {
             response.json::<Self>().await.map_err(|e| e.into())
+        } else if response.status().as_u16() == 404 {
+            Err(ReportableError::UserError("user does not exist!"))
         } else {
-            Err(ReportableError::InternalError("unexpected status code"))
+            Err(ReportableError::InternalError("Unexpected status code from users.roblox.com/v1/users/.."))
         }
     }
 
@@ -64,11 +66,11 @@ impl User {
                     .await?
                     .get("Id")
                     .and_then(|v| v.as_i64())
-                    .ok_or(ReportableError::InternalError("User does not exist"))?,
+                    .ok_or(ReportableError::UserError("user does not exist!"))?,
             )
             .await
         } else {
-            Err(ReportableError::InternalError("unexpected status code"))
+            Err(ReportableError::InternalError("unexpected status code from api.roblox.com/users/get-by-username?username=.."))
         }
     }
 
