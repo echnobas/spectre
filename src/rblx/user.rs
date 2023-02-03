@@ -1,7 +1,8 @@
 use serde_json::Value;
 
-use anyhow::Result;
+use super::url;
 use crate::error::ReportableError;
+use anyhow::Result;
 
 #[derive(PartialEq, Debug, Deserialize)]
 pub struct User {
@@ -12,6 +13,7 @@ pub struct User {
     description: String,
 }
 
+#[allow(dead_code, unused_variables)]
 impl User {
     pub fn get_username(&self) -> &str {
         &self.username
@@ -26,6 +28,7 @@ impl User {
     }
 
     pub async fn get_thumbnail(&self) -> Result<String, ReportableError> {
+        // Ideally redis cache check here, Option<Redis>?
         #[derive(Deserialize)]
         struct Response {
             #[serde(rename = "imageUrl")]
@@ -54,11 +57,7 @@ impl User {
     }
 
     pub async fn from_username<T: AsRef<str>>(username: T) -> Result<Self, ReportableError> {
-        let response = reqwest::get(&format!(
-            "https://api.roblox.com/users/get-by-username?username={}",
-            username.as_ref()
-        ))
-        .await?;
+        let response = reqwest::get(url::users_get_by_username(username)).await?;
         if response.status().is_success() {
             Self::from_userid(
                 response
@@ -66,11 +65,11 @@ impl User {
                     .await?
                     .get("Id")
                     .and_then(|v| v.as_i64())
-                    .ok_or(ReportableError::UserError("user does not exist!"))?,
+                    .ok_or(ReportableError::InternalError("User does not exist"))?,
             )
             .await
         } else {
-            Err(ReportableError::InternalError("unexpected status code from api.roblox.com/users/get-by-username?username=.."))
+            Err(ReportableError::InternalError("unexpected status code"))
         }
     }
 
@@ -101,11 +100,14 @@ mod tests {
         assert_eq!(user.get_username(), "Roblox");
     }
 
-
     // May fail if avatar URL changes
     #[tokio::test]
     async fn test_get_thumbnail() {
         let user = User::from_userid(1).await.unwrap();
-        assert_eq!(user.get_thumbnail().await.unwrap(), "https://tr.rbxcdn.com/b7c2dce11d623d2261d6cc9368174a41/420/420/AvatarBust/Png".to_owned());
+        assert_eq!(
+            user.get_thumbnail().await.unwrap(),
+            "https://tr.rbxcdn.com/b7c2dce11d623d2261d6cc9368174a41/420/420/AvatarBust/Png"
+                .to_owned()
+        );
     }
 }
