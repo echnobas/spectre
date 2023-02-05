@@ -7,6 +7,7 @@ use serenity::model::prelude::interaction::application_command::{
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Context;
 
+use crate::database::DatabaseClient;
 use crate::error::ReportableError;
 use crate::PostgresPool;
 use anyhow::Result;
@@ -24,13 +25,13 @@ pub async fn run(
         }) => {
             println!("{name}, {:?}", options);
 
-            let pool = match ctx.data.read().await.get::<PostgresPool>() {
-                Some(v) => v.get().await.ok(),
-                None => None,
-            }
-            .ok_or(ReportableError::InternalError(
-                "Error getting database handle".into(),
-            ))?;
+            let client = ctx.data.read().await;
+            let client = client
+                .get::<PostgresPool>()
+                .ok_or(ReportableError::InternalError(
+                    "Database pool not in context",
+                ))?;
+            let client = DatabaseClient::new(&client, command.guild_id.unwrap()).await?;
 
             match name.as_str() {
                 operation @ ("add" | "remove") => {
@@ -58,15 +59,7 @@ pub async fn run(
                         }
                     };
 
-                    pool.execute(
-                        "call ADD_XP($1::text, $2::bigint, $3::bigint)",
-                        &[
-                            &command.guild_id.unwrap().to_string(),
-                            &user.get_user_id(),
-                            &xp,
-                        ],
-                    )
-                    .await?;
+                    client.add_xp(user.get_user_id(), xp).await?;
 
                     command
                         .create_interaction_response(&ctx.http, |resp| {
@@ -99,31 +92,44 @@ pub async fn run(
                             ))
                         }
                     };
+
                     let thumbnail = user.get_thumbnail().await?;
 
-                    match pool.query_opt("SELECT * FROM GET_USER($1::text, $2::bigint) as t(rbx_id bigint, d_id bigint, xp bigint);", 
-                        &[&command.guild_id.unwrap().to_string(), &user.get_user_id()]).await? {
-                        Some(row) => {
-                            println!("Found");
-                            command.create_interaction_response(&ctx.http, |resp| {
-                                resp.kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|m| m.embed(|e| e
-                                    .title(&format!("Success"))
-                                    .description(&format!("User: {}\nXP: {}", user.get_username(), row.get::<_, i64>("xp")))
-                                    .thumbnail(&thumbnail)
-                                ))
-                            }).await?;
-                        },
+                    match client.get_member(user.get_user_id()).await? {
+                        Some(member) => {
+                            command
+                                .create_interaction_response(&ctx.http, |resp| {
+                                    resp.kind(InteractionResponseType::ChannelMessageWithSource)
+                                        .interaction_response_data(|m| {
+                                            m.embed(|e| {
+                                                e.title(&format!("Success"))
+                                                    .description(&format!(
+                                                        "User: {}\nXP: {}",
+                                                        user.get_username(),
+                                                        member.get_xp()
+                                                    ))
+                                                    .thumbnail(&thumbnail)
+                                            })
+                                        })
+                                })
+                                .await?;
+                        }
                         None => {
-                            println!("Not Found");
-                            command.create_interaction_response(&ctx.http, |resp| {
-                                resp.kind(InteractionResponseType::ChannelMessageWithSource)
-                                .interaction_response_data(|m| m.embed(|e| e
-                                    .title(&format!("Success"))
-                                    .description(&format!("User: {}\nXP: 0", user.get_username()))
-                                    .thumbnail(&thumbnail)
-                                ))
-                            }).await?;
+                            command
+                                .create_interaction_response(&ctx.http, |resp| {
+                                    resp.kind(InteractionResponseType::ChannelMessageWithSource)
+                                        .interaction_response_data(|m| {
+                                            m.embed(|e| {
+                                                e.title(&format!("Success"))
+                                                    .description(&format!(
+                                                        "User: {}\nXP: 0",
+                                                        user.get_username()
+                                                    ))
+                                                    .thumbnail(&thumbnail)
+                                            })
+                                        })
+                                })
+                                .await?;
                         }
                     }
                 }

@@ -1,4 +1,5 @@
 mod commands;
+mod database;
 mod error;
 mod rblx;
 
@@ -6,21 +7,21 @@ mod rblx;
 extern crate serde;
 
 use std::env;
-use std::error::Error;
-use std::sync::Arc;
 
-use serenity::async_trait;
+use error::ReportableError;
+use serenity::builder::CreateEmbed;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
+use serenity::{async_trait, model::prelude::interaction::InteractionResponseType};
 
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 
 // Why the fuck this is necessary is beyond me
 pub struct PostgresPool;
 impl TypeMapKey for PostgresPool {
-    type Value = Arc<Pool>;
+    type Value = Pool;
 }
 
 struct Handler;
@@ -40,16 +41,42 @@ impl EventHandler for Handler {
             match command_result {
                 Ok(_) => {}
                 Err(why) => {
-                    println!("{:?}", why);
-                    _ = command
-                        .channel_id
-                        .send_message(&ctx.http, |m| {
-                            m.embed(|e| {
-                                e.title("An error occured")
-                                    .description(&format!("```\n{:?}```", why))
-                            })
-                        })
-                        .await;
+                    let mut embed = CreateEmbed::default();
+                    match why {
+                        ReportableError::UserError(msg) => {
+                            let embed = embed
+                                .title("Uh oh..")
+                                .description(&format!("```\n{}```", msg))
+                                .to_owned();
+
+                            // Try create interaction response, fails when response already made
+                            match command
+                                .create_interaction_response(&ctx.http, |resp| {
+                                    resp.kind(InteractionResponseType::ChannelMessageWithSource)
+                                        .interaction_response_data(|m| {
+                                            m.set_embed(embed.to_owned())
+                                        })
+                                })
+                                .await
+                            {
+                                Ok(_) => {}
+                                Err(_) => {
+                                    // Send error as message instead
+                                    _ = command
+                                        .channel_id
+                                        .send_message(&ctx.http, |m| m.set_embed(embed.to_owned()))
+                                        .await;
+                                }
+                            }
+                        }
+                        _ => {
+                            eprintln!("FATAL: {:?}", why);
+                            _ = command
+                                .channel_id
+                                .send_message(&ctx.http, |m| m.set_embed(embed.to_owned()))
+                                .await;
+                        }
+                    }
                 }
             }
         }
@@ -110,7 +137,7 @@ async fn main() {
             .await
             .unwrap();
 
-        data.insert::<PostgresPool>(Arc::new(pool));
+        data.insert::<PostgresPool>(pool);
     }
 
     if let Err(why) = client.start().await {

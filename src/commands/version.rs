@@ -1,12 +1,9 @@
 use serenity::builder::CreateApplicationCommand;
-use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
-use serenity::model::prelude::interaction::application_command::{
-    CommandDataOption, CommandDataOptionValue,
-};
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Context;
 
+use crate::database::DatabaseClient;
 use crate::error::ReportableError;
 use crate::PostgresPool;
 use anyhow::Result;
@@ -15,18 +12,17 @@ pub async fn run(
     ctx: &Context,
     command: &ApplicationCommandInteraction,
 ) -> Result<(), ReportableError> {
-    let pool = match ctx.data.read().await.get::<PostgresPool>() {
-        Some(v) => v.get().await.ok(),
-        None => None,
-    }
-    .ok_or(ReportableError::InternalError(
-        "Error getting database handle".into(),
-    ))?;
+    let client = ctx.data.read().await;
+    let client = client
+        .get::<PostgresPool>()
+        .ok_or(ReportableError::InternalError(
+            "Database pool not in context",
+        ))?;
 
-    let pgversion = pool
-        .query_one("SELECT version();", &[])
+    let pgversion = DatabaseClient::new(&client, command.guild_id.unwrap())
         .await?
-        .get::<_, String>(0);
+        .get_version()
+        .await?;
 
     command
         .create_interaction_response(&ctx.http, |resp| {

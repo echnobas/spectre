@@ -5,6 +5,7 @@ use serenity::model::prelude::interaction::application_command::CommandDataOptio
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::Context;
 
+use crate::database::DatabaseClient;
 use crate::error::ReportableError;
 use crate::PostgresPool;
 use anyhow::Result;
@@ -31,32 +32,35 @@ pub async fn run(
         })
         .await?;
 
-    let pool = match ctx.data.read().await.get::<PostgresPool>() {
-        Some(v) => v.get().await.ok(),
-        None => None,
-    }
-    .ok_or(ReportableError::InternalError(
-        "Error getting database handle".into(),
-    ))?;
+    let client = ctx.data.read().await;
+    let client = client
+        .get::<PostgresPool>()
+        .ok_or(ReportableError::InternalError(
+            "Database pool not in context",
+        ))?;
+    let client = DatabaseClient::new(client, command.guild_id.unwrap()).await?;
 
-    let guild_id = command.guild_id.unwrap().to_string();
-    // Does schema exist?
-
-    if pool.query_opt("SELECT schema_name FROM information_schema.schemata WHERE schema_name = CONCAT('data_', $1::text);", &[ &guild_id ]  ).await?.is_some() {
-        command.create_followup_message(&ctx.http, |resp| {
-            resp.embed(|e| e
-                .title("Failure")
-                .description(&format!("Server ({}) is already present in the database :-1:", command.guild_id.unwrap()))
-            )
-        }).await?;
+    if client.register_group().await? {
+        command
+            .create_followup_message(&ctx.http, |resp| {
+                resp.embed(|e| {
+                    e.title("Failure").description(&format!(
+                        "Server ({}) is already present in the database :-1:",
+                        command.guild_id.unwrap()
+                    ))
+                })
+            })
+            .await?;
     } else {
-        pool.execute("call register_group($1::text);", &[&guild_id]).await?;
-        command.create_followup_message(&ctx.http, |resp| {
-            resp.embed(|e| e
-                .title("Success")
-                .description(&format!("Successfully registered your group ({group}) in the database :+1:", ))
-            )
-        }).await?;
+        command
+            .create_followup_message(&ctx.http, |resp| {
+                resp.embed(|e| {
+                    e.title("Success").description(&format!(
+                        "Successfully registered your group ({group}) in the database :+1:",
+                    ))
+                })
+            })
+            .await?;
     }
     Ok(())
 }
