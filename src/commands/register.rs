@@ -7,6 +7,7 @@ use serenity::prelude::Context;
 
 use crate::database::DatabaseClient;
 use crate::error::ReportableError;
+use crate::util::EmbedResponse;
 use crate::PostgresPool;
 use anyhow::Result;
 
@@ -27,7 +28,8 @@ pub async fn run(
         .create_interaction_response(&ctx.http, |resp| {
             resp.kind(InteractionResponseType::ChannelMessageWithSource)
                 .interaction_response_data(|m| {
-                    m.embed(|e| e.title("Processing").description("Please wait.."))
+                    m.report_status("Processing", "Please wait...")
+                        .ephemeral(true)
                 })
         })
         .await?;
@@ -43,22 +45,22 @@ pub async fn run(
     if client.register_group().await? {
         command
             .create_followup_message(&ctx.http, |resp| {
-                resp.embed(|e| {
-                    e.title("Failure").description(&format!(
+                resp.report_status(
+                    "Failure",
+                    format!(
                         "Server ({}) is already present in the database :-1:",
                         command.guild_id.unwrap()
-                    ))
-                })
+                    ),
+                )
             })
             .await?;
     } else {
         command
             .create_followup_message(&ctx.http, |resp| {
-                resp.embed(|e| {
-                    e.title("Success").description(&format!(
-                        "Successfully registered your group ({group}) in the database :+1:",
-                    ))
-                })
+                resp.report_status(
+                    "Success",
+                    format!("Successfully registered your group ({group}) in the database :+1:",),
+                )
             })
             .await?;
     }

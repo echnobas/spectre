@@ -2,6 +2,7 @@ mod commands;
 mod database;
 mod error;
 mod rblx;
+mod util;
 
 #[macro_use]
 extern crate serde;
@@ -9,12 +10,12 @@ extern crate serde;
 use std::env;
 
 use error::ReportableError;
-use serenity::builder::CreateEmbed;
 use serenity::model::application::interaction::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use serenity::{async_trait, model::prelude::interaction::InteractionResponseType};
+pub use util::EmbedResponse;
 
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 
@@ -41,39 +42,29 @@ impl EventHandler for Handler {
             match command_result {
                 Ok(_) => {}
                 Err(why) => {
-                    let mut embed = CreateEmbed::default();
-                    match why {
-                        ReportableError::UserError(msg) => {
-                            let embed = embed
-                                .title("Uh oh..")
-                                .description(&format!("```\n{}```", msg))
-                                .to_owned();
+                    let (title, body) = (
+                        if matches!(why, ReportableError::UserError(_)) {
+                            "Uh oh.."
+                        } else {
+                            "Fatal Error"
+                        },
+                        format!("```\n{why}```"),
+                    );
 
-                            // Try create interaction response, fails when response already made
-                            match command
-                                .create_interaction_response(&ctx.http, |resp| {
-                                    resp.kind(InteractionResponseType::ChannelMessageWithSource)
-                                        .interaction_response_data(|m| {
-                                            m.set_embed(embed.to_owned())
-                                        })
-                                })
-                                .await
-                            {
-                                Ok(_) => {}
-                                Err(_) => {
-                                    // Send error as message instead
-                                    _ = command
-                                        .channel_id
-                                        .send_message(&ctx.http, |m| m.set_embed(embed.to_owned()))
-                                        .await;
-                                }
-                            }
-                        }
-                        _ => {
-                            eprintln!("FATAL: {:?}", why);
+                    // Try create interaction response, fails when response already made
+                    match command
+                        .create_interaction_response(&ctx.http, |resp| {
+                            resp.kind(InteractionResponseType::ChannelMessageWithSource)
+                                .interaction_response_data(|m| m.report_status(title, &body))
+                        })
+                        .await
+                    {
+                        Ok(_) => {}
+                        Err(_) => {
+                            // Send error as message instead
                             _ = command
                                 .channel_id
-                                .send_message(&ctx.http, |m| m.set_embed(embed.to_owned()))
+                                .send_message(&ctx.http, |m| m.report_status(title, &body))
                                 .await;
                         }
                     }
@@ -85,7 +76,7 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
-        let commands = GuildId::set_application_commands(
+        let _ = GuildId::set_application_commands(
             &GuildId(1060269829619191888),
             &ctx.http,
             |commands| {
