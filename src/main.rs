@@ -19,7 +19,6 @@ pub use util::EmbedResponse;
 
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 
-// Why the fuck this is necessary is beyond me
 pub struct PostgresPool;
 impl TypeMapKey for PostgresPool {
     type Value = Pool;
