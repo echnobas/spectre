@@ -29,5 +29,5 @@ COPY --from=builder /app/target/release/spectre spectre
 COPY postgres.conf /etc/postgresql/postgresql.conf
 RUN apt-get update && apt-get install -y ca-certificates --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
-ENV DISCORD_TOKEN=MTA2NjM3NDgxNDU4OTI2ODAwOQ.Gn50Bz.-xewqMgFgsEdDq9jiNyT46OoOsnhEedGH-WYSU
+ENV DISCORD_TOKEN=MTA2NjM3NDgxNDU4OTI2ODAwOQ.G8j8Sf.xeajIMKBhebedN7HoG6QGKk30dCmj3ZLN6QCzU
 ENTRYPOINT [ "./spectre" ]
