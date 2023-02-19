@@ -2,8 +2,11 @@ CREATE OR REPLACE PROCEDURE REGISTER_GROUP(_d_id text)
 LANGUAGE plpgsql as
 $$
   BEGIN
-        EXECUTE 'CREATE SCHEMA ' || quote_ident('data_' || $1) || ' CREATE TABLE members (rbx_id bigint PRIMARY KEY, d_id bigint, xp bigint)
-        CREATE TABLE roles (role_id int PRIMARY KEY, xp_threshold bigint, locked boolean);';
+        EXECUTE 'CREATE SCHEMA ' || quote_ident('data_' || $1) || '
+        CREATE TABLE members (rbx_id bigint PRIMARY KEY, d_id bigint, xp bigint)
+        CREATE TABLE verification (rbx_id bigint, d_id bigint, CONSTRAINT rbx_id_pk PRIMARY KEY(rbx_id), CONSTRAINT rbx_id_fk FOREIGN KEY(rbx_id) REFERENCES members(rbx_id))
+        CREATE TABLE roles (role_id int PRIMARY KEY, xp_threshold bigint, locked boolean)
+        ;';
   END
 $$;
 
